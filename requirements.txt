@@ -1,0 +1,1 @@
+Flask pandas pymysql psycopg2 Werkzeug

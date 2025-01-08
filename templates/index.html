@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Importer</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css" rel="stylesheet"> <!-- FontAwesome CDN -->
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 500px;
+            padding: 30px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        .form-control {
+            border-radius: 50px;
+        }
+        .btn-primary {
+            width: 100%;
+            padding: 12px;
+            border-radius: 50px;
+            margin-top: 20px; /* Added margin for spacing */
+        }
+        .form-row .form-group {
+            margin-bottom: 1.5rem;
+        }
+        .file-upload-box {
+            border: 2px dashed #007bff;
+            padding: 30px;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            background-color: #f0f8ff;
+            position: relative;
+            min-height: 120px; /* Ensures a minimum size */
+        }
+        .file-upload-box input[type="file"] {
+            display: none;
+        }
+        .file-icon {
+            font-size: 48px;
+            
+        }
+        .file-upload-box .file-name {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h2 class="text-center mb-4">Database Importer</h2>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="alert alert-dismissible fade show" role="alert">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }} mt-2">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+        
+    <!-- Database Connection Form (always visible) -->
+    <div id="db-connect-form" {% if session.get('db_connected') %}style="display: none;"{% endif %}>
+        <h4>Connect to Database</h4>
+        <form method="POST" action="/connect" id="db-form">
+            <!-- Database Type Selection -->
+            <div class="form-group">
+                <label for="db_type">Select Database Type:</label>
+                <select class="form-control" id="db_type" name="db_type" required>
+                    <option value="mysql">MySQL</option>
+                    <option value="postgresql">PostgreSQL</option>
+                </select>
+            </div>
+            <!-- Host -->
+            <div class="form-group">
+                <label for="host">Database Host:</label>
+                <input type="text" class="form-control" id="host" name="host" placeholder="e.g. localhost" required>
+            </div>
+            <!-- User -->
+            <div class="form-group">
+                <label for="user">Database User:</label>
+                <input type="text" class="form-control" id="user" name="user" placeholder="e.g. root" required>
+            </div>
+            <!-- Password -->
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" class="form-control" id="password" name="password" placeholder="Enter your password" required>
+            </div>
+            <!-- Submit Button -->
+            <button type="submit" class="btn btn-primary" id="connect-btn">Connect</button>
+        </form>
+    </div>
+
+    <!-- File Upload Section (only visible when db_connected is True) -->
+    <div id="file-upload-form" {% if not session.get('db_connected') %}style="display: none;"{% endif %}>
+        <h4>Upload File</h4>
+        <form method="POST" action="/upload" enctype="multipart/form-data">
+            <!-- Database Name (Optional Create) -->
+            <div class="form-group">
+                <label for="create_database">Database Name (Create if not exists):</label>
+                <input type="text" class="form-control" id="create_database" name="create_database" placeholder="Enter database name">
+            </div>
+            <!-- Table Name (Optional Create) -->
+            <div class="form-group">
+                <label for="table_name">Table Name (Create if not exists):</label>
+                <input type="text" class="form-control" id="table_name" name="table_name" placeholder="Enter table name" required>
+            </div>
+
+            <!-- File Upload (Drag-and-Drop Area) -->
+            <div class="file-upload-box" id="file-upload-box">
+                <div class="file-icon"><i class="fas fa-folder-open"></i></div>
+                <input type="file" id="file" name="file" required>
+                <div class="file-name" id="file-name">No file chosen</div>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" class="btn btn-primary">Upload and Insert</button>
+        </form>
+    </div>
+
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.3/dist/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+    <script>
+        // Handle file upload box
+        const fileInput = document.getElementById('file');
+        const fileUploadBox = document.getElementById('file-upload-box');
+        const fileName = document.getElementById('file-name');
+
+        fileUploadBox.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const selectedFile = e.target.files[0];
+            if (selectedFile) {
+                fileName.textContent = selectedFile.name;
+                const extension = selectedFile.name.split('.').pop().toLowerCase();
+
+                // Dynamic icon change based on file type
+                switch (extension) {
+                    case 'csv':
+                        fileUploadBox.querySelector('.file-icon').innerHTML = '<img src="https://img.icons8.com/fluency/48/null/csv.png" alt="CSV Icon">';
+                        break;
+                    case 'xls':
+                        fileUploadBox.querySelector('.file-icon').innerHTML = '<img width="48" height="48" src="https://img.icons8.com/fluency/48/xls.png" alt="xls"/>';
+                        break;
+                    case 'xlsx':
+                        fileUploadBox.querySelector('.file-icon').innerHTML = '<img width="48" height="48" src="https://img.icons8.com/fluency/48/microsoft-excel-2019.png" alt="microsoft-excel-2019"/>';
+                        break;
+                    case 'pdf':
+                        fileUploadBox.querySelector('.file-icon').innerHTML = '<img width="48" height="48" src="https://img.icons8.com/fluency/48/pdf--v2.png" alt="pdf--v2"/>';
+                        break;             
+                    default:
+                        fileUploadBox.querySelector('.file-icon').innerHTML = '<img width="48" height="48" src="https://img.icons8.com/color/48/opened-folder.png" alt="opened-folder"/>';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
